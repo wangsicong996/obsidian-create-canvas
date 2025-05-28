@@ -64,7 +64,7 @@ export default class CanvasCreatorPlugin extends Plugin {
                             .setTitle('创建并添加Canvas')
                             .setIcon('plus-square')
                             .onClick(async () => {
-                                const canvasView = view as CanvasView;
+                                const canvasView = view as unknown as CanvasView;
                                 if (canvasView.file) {
                                     await this.createAndAddCanvasToFile(canvasView.file);
                                 }
@@ -82,7 +82,7 @@ export default class CanvasCreatorPlugin extends Plugin {
                 const activeLeaf = this.app.workspace.activeLeaf;
                 if (activeLeaf && this.isCanvasLeaf(activeLeaf)) {
                     if (!checking) {
-                        const canvasView = activeLeaf.view as CanvasView;
+                        const canvasView = activeLeaf.view as unknown as CanvasView;
                         if (canvasView.file) {
                             this.createAndAddCanvasToFile(canvasView.file);
                         }
@@ -108,7 +108,15 @@ export default class CanvasCreatorPlugin extends Plugin {
     private getActiveCanvasView(): CanvasView | null {
         const activeLeaf = this.app.workspace.activeLeaf;
         if (activeLeaf && this.isCanvasLeaf(activeLeaf)) {
-            return activeLeaf.view as CanvasView;
+            return activeLeaf.view as unknown as CanvasView;
+        }
+        return null;
+    }
+
+    // 安全获取canvas文件
+    private getCanvasFile(view: any): TFile | null {
+        if (this.isCanvasView(view) && view.file instanceof TFile) {
+            return view.file;
         }
         return null;
     }
@@ -188,15 +196,7 @@ export default class CanvasCreatorPlugin extends Plugin {
             // 9. 如果当前正在查看这个canvas，刷新视图
             const activeCanvasView = this.getActiveCanvasView();
             if (activeCanvasView && activeCanvasView.file?.path === targetCanvasFile.path) {
-                if (activeCanvasView.requestSave) {
-                    activeCanvasView.requestSave();
-                }
-                // 尝试刷新canvas视图
-                setTimeout(() => {
-                    if (activeCanvasView.requestParse) {
-                        activeCanvasView.requestParse();
-                    }
-                }, 100);
+                this.refreshCanvasView(activeCanvasView);
             }
 
             new Notice(`成功创建并添加Canvas: ${canvasFileName} 到 ${targetCanvasFile.name}`);
@@ -204,6 +204,23 @@ export default class CanvasCreatorPlugin extends Plugin {
         } catch (error) {
             console.error('创建Canvas时出错:', error);
             new Notice('创建Canvas失败，请查看控制台获取详细信息');
+        }
+    }
+
+    // 刷新canvas视图
+    private refreshCanvasView(canvasView: CanvasView) {
+        try {
+            if (canvasView.requestSave) {
+                canvasView.requestSave();
+            }
+            // 尝试刷新canvas视图
+            setTimeout(() => {
+                if (canvasView.requestParse) {
+                    canvasView.requestParse();
+                }
+            }, 100);
+        } catch (error) {
+            console.error('刷新Canvas视图时出错:', error);
         }
     }
 
