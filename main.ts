@@ -1,5 +1,5 @@
 // main.ts
-import { Plugin, Menu, TFile, Notice, TAbstractFile } from 'obsidian';
+import { Plugin, Menu, TFile, Notice, TAbstractFile, WorkspaceLeaf } from 'obsidian';
 
 interface CanvasData {
     nodes: CanvasNode[];
@@ -23,6 +23,14 @@ interface CanvasEdge {
     fromSide: string;
     toNode: string;
     toSide: string;
+}
+
+// Canvas视图的类型定义
+interface CanvasView {
+    getViewType(): string;
+    file: TFile;
+    requestSave?(): void;
+    requestParse?(): void;
 }
 
 export default class CanvasCreatorPlugin extends Plugin {
@@ -50,15 +58,15 @@ export default class CanvasCreatorPlugin extends Plugin {
         this.registerEvent(
             this.app.workspace.on('editor-menu', (menu: Menu, editor, view) => {
                 // 检查是否在canvas视图中
-                if (view && view.getViewType() === 'canvas') {
+                if (view && this.isCanvasView(view)) {
                     menu.addItem((item) => {
                         item
                             .setTitle('创建并添加Canvas')
                             .setIcon('plus-square')
                             .onClick(async () => {
-                                const canvasFile = (view as any).file;
-                                if (canvasFile) {
-                                    await this.createAndAddCanvasToFile(canvasFile);
+                                const canvasView = view as CanvasView;
+                                if (canvasView.file) {
+                                    await this.createAndAddCanvasToFile(canvasView.file);
                                 }
                             });
                     });
@@ -71,12 +79,12 @@ export default class CanvasCreatorPlugin extends Plugin {
             id: 'create-and-add-canvas',
             name: '创建并添加Canvas到当前Canvas',
             checkCallback: (checking: boolean) => {
-                const activeView = this.app.workspace.getActiveViewOfType('canvas' as any);
-                if (activeView) {
+                const activeLeaf = this.app.workspace.activeLeaf;
+                if (activeLeaf && this.isCanvasLeaf(activeLeaf)) {
                     if (!checking) {
-                        const canvasFile = (activeView as any).file;
-                        if (canvasFile) {
-                            this.createAndAddCanvasToFile(canvasFile);
+                        const canvasView = activeLeaf.view as CanvasView;
+                        if (canvasView.file) {
+                            this.createAndAddCanvasToFile(canvasView.file);
                         }
                     }
                     return true;
@@ -84,6 +92,25 @@ export default class CanvasCreatorPlugin extends Plugin {
                 return false;
             }
         });
+    }
+
+    // 检查是否为canvas视图
+    private isCanvasView(view: any): boolean {
+        return view && typeof view.getViewType === 'function' && view.getViewType() === 'canvas';
+    }
+
+    // 检查是否为canvas leaf
+    private isCanvasLeaf(leaf: WorkspaceLeaf): boolean {
+        return leaf.view && this.isCanvasView(leaf.view);
+    }
+
+    // 获取当前活动的canvas视图
+    private getActiveCanvasView(): CanvasView | null {
+        const activeLeaf = this.app.workspace.activeLeaf;
+        if (activeLeaf && this.isCanvasLeaf(activeLeaf)) {
+            return activeLeaf.view as CanvasView;
+        }
+        return null;
     }
 
     async createAndAddCanvasToFile(targetCanvasFile: TFile) {
@@ -117,7 +144,23 @@ export default class CanvasCreatorPlugin extends Plugin {
 
             // 4. 读取目标canvas文件的数据
             const currentCanvasContent = await this.app.vault.read(targetCanvasFile);
-            const currentCanvasData: CanvasData = JSON.parse(currentCanvasContent);
+            let currentCanvasData: CanvasData;
+            
+            try {
+                currentCanvasData = JSON.parse(currentCanvasContent);
+            } catch (parseError) {
+                console.error('解析Canvas文件失败:', parseError);
+                new Notice('Canvas文件格式错误，无法解析');
+                return;
+            }
+
+            // 确保nodes数组存在
+            if (!currentCanvasData.nodes) {
+                currentCanvasData.nodes = [];
+            }
+            if (!currentCanvasData.edges) {
+                currentCanvasData.edges = [];
+            }
 
             // 5. 计算新节点的位置（所有元素的右下角）
             const newNodePosition = this.calculateBottomRightPosition(currentCanvasData.nodes);
@@ -143,15 +186,15 @@ export default class CanvasCreatorPlugin extends Plugin {
             );
 
             // 9. 如果当前正在查看这个canvas，刷新视图
-            const activeView = this.app.workspace.getActiveViewOfType('canvas' as any);
-            if (activeView && (activeView as any).file?.path === targetCanvasFile.path) {
-                if ((activeView as any).requestSave) {
-                    (activeView as any).requestSave();
+            const activeCanvasView = this.getActiveCanvasView();
+            if (activeCanvasView && activeCanvasView.file?.path === targetCanvasFile.path) {
+                if (activeCanvasView.requestSave) {
+                    activeCanvasView.requestSave();
                 }
                 // 尝试刷新canvas视图
                 setTimeout(() => {
-                    if ((activeView as any).requestParse) {
-                        (activeView as any).requestParse();
+                    if (activeCanvasView.requestParse) {
+                        activeCanvasView.requestParse();
                     }
                 }, 100);
             }
@@ -176,8 +219,8 @@ export default class CanvasCreatorPlugin extends Plugin {
 
         // 找到所有节点的最右下角位置
         nodes.forEach(node => {
-            const nodeRightX = node.x + node.width;
-            const nodeBottomY = node.y + node.height;
+            const nodeRightX = node.x + (node.width || 400);
+            const nodeBottomY = node.y + (node.height || 300);
             
             if (nodeRightX > maxX) {
                 maxX = nodeRightX;
