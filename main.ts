@@ -1,4 +1,4 @@
-import { Plugin, Menu, TFile, Notice } from 'obsidian';
+import { Plugin, Menu, TFile, Notice, View } from 'obsidian';
 
 interface CanvasData {
     nodes: CanvasNode[];
@@ -32,7 +32,7 @@ export default class CanvasCreatorPlugin extends Plugin {
         this.registerEvent(
             this.app.workspace.on('editor-menu', (menu: Menu, editor, view) => {
                 // 检查是否在canvas视图中
-                if (typeof view.getViewType === 'function' && view.getViewType() === 'canvas') {
+                if (view instanceof View && view.getViewType() === 'canvas') {
                     menu.addItem((item) => {
                         item
                             .setTitle('创建并添加Canvas')
