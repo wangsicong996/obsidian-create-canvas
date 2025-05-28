@@ -32,7 +32,7 @@ export default class CanvasCreatorPlugin extends Plugin {
         this.registerEvent(
             this.app.workspace.on('editor-menu', (menu: Menu, editor, view) => {
                 // 检查是否在canvas视图中
-                if (view.getViewType() === 'canvas') {
+                if (typeof view.getViewType === 'function' && view.getViewType() === 'canvas') {
                     menu.addItem((item) => {
                         item
                             .setTitle('创建并添加Canvas')
@@ -42,20 +42,6 @@ export default class CanvasCreatorPlugin extends Plugin {
                             });
                     });
                 }
-            })
-        );
-
-        // 为canvas视图添加右键菜单
-        this.registerEvent(
-            this.app.workspace.on('canvas-menu', (menu: Menu, canvas) => {
-                menu.addItem((item) => {
-                    item
-                        .setTitle('创建并添加Canvas')
-                        .setIcon('plus-square')
-                        .onClick(async () => {
-                            await this.createAndAddCanvas(canvas);
-                        });
-                });
             })
         );
 
