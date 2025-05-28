@@ -1,0 +1,11 @@
+{
+    "id": "canvas-creator",
+    "name": "Canvas Creator",
+    "version": "1.0.0",
+    "minAppVersion": "0.15.0",
+    "description": "在当前Canvas中右键创建并添加新的Canvas文件",
+    "author": "Your Name",
+    "authorUrl": "",
+    "fundingUrl": "",
+    "isDesktopOnly": false
+}
